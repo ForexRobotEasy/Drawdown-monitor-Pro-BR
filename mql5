@@ -1,0 +1,104 @@
+
+// Program: Drawdown Monitor Pro BR
+// Developer's site: forexroboteasy.com
+// Developer: Forex Robot Easy Team
+
+// Include necessary libraries and define constants
+#include <Trade\Trade.mqh>
+#include <Arrays\List\ArrayLongList.mqh>
+
+#define MAX_TIMEFRAMES 5
+#define MAX_LOTS 0.1
+#define DRAWDOWN_THRESHOLD 0.05
+
+// Create an instance of the Trade class
+CTrade trade;
+
+// Define the structure to store trade information
+struct STradeInfo
+{
+   double entryPrice;
+   double stopLoss;
+};
+
+// Create an array to store trade information for different time frames
+ArrayLongList<STradeInfo> tradeInfo[MAX_TIMEFRAMES];
+
+// Function to handle trade execution
+void ExecuteTrade(double price, double stopLoss)
+{
+   // Place a trade using the Trade class instance
+   trade.Buy(MAX_LOTS, price, stopLoss);
+   
+   // Store trade information in the array
+   STradeInfo info;
+   info.entryPrice = price;
+   info.stopLoss = stopLoss;
+   tradeInfo[trade.Timeframe()].Add(info);
+}
+
+// Function to analyze drawdowns and generate alerts
+void AnalyzeDrawdowns()
+{
+   for (int i = 0; i < MAX_TIMEFRAMES; i++)
+   {
+      for (int j = 0; j < tradeInfo[i].Total(); j++)
+      {
+         STradeInfo info = tradeInfo[i].At(j);
+         
+         // Calculate drawdown percentage
+         double drawdown = (info.entryPrice - trade.Ask()) / info.entryPrice;
+         
+         if (drawdown > DRAWDOWN_THRESHOLD)
+         {
+            // Generate an alert for drawdown exceeding the threshold
+            Print('Drawdown exceeded threshold on timeframe ', trade.Timeframe());
+            Print('Entry Price: ', info.entryPrice);
+            Print('Current Price: ', trade.Ask());
+            Print('Stop Loss: ', info.stopLoss);
+         }
+      }
+   }
+}
+
+// Main program entry point
+void OnTick()
+{
+   // Monitor drawdowns on each time frame
+   for (int i = 0; i < MAX_TIMEFRAMES; i++)
+   {
+      trade.SetTimeframe(i);
+      
+      // Check if a trade needs to be executed based on time frame control
+      if (trade.Time() == 0 && trade.DayOfWeek() >= 1 && trade.DayOfWeek() <= 5)
+      {
+         // Execute a trade with a random entry price and stop loss
+         double entryPrice = trade.Bid() + NormalizeDouble(MathRand() * 0.01, trade.Digits());
+         double stopLoss = entryPrice - NormalizeDouble(MathRand() * 0.001, trade.Digits());
+         ExecuteTrade(entryPrice, stopLoss);
+      }
+   }
+   
+   // Analyze drawdowns and generate alerts
+   AnalyzeDrawdowns();
+}
+
+// Program initialization function
+void OnInit()
+{
+   // Enable trade execution
+   trade.SetExpertMagicNumber(123456);
+   trade.SetDeviationInPoints(10);
+   trade.SetStopLoss(100);
+   trade.SetTakeProfit(200);
+   trade.SetOrderComment('Drawdown Monitor Pro BR');
+   trade.SetAsyncMode(true);
+   trade.SetLastError(0);
+}
+
+// Program termination function
+void OnDeinit(const int reason)
+{
+   // Close all open trades before termination
+   trade.CloseAll();
+}
